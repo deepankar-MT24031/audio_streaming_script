@@ -1,23 +1,13 @@
 #!/bin/bash
 
-set -e # Exit immediately if a command exits with a non-zero status
-
-PROJECT_DIR="audio_streamer"
-NULL_SINK_NAME="virtual-audio-capture"
-NULL_SINK_MODULE="module-null-sink"
-
 # --- Helper Functions ---
 check_command() {
   if ! command -v "$1" &> /dev/null; then
-    echo "Error: '$1' is not installed. Please install it and try again."
+    echo "Error: '$1' is not installed. Please install it (e.g., 'sudo apt install $1') and try again."
     exit 1
   else
     echo "'$1' found."
   fi
-}
-
-is_module_exists() {
-    pactl list short modules | grep -q "$1"
 }
 
 # --- Step 1/6: Checking Prerequisites ---
@@ -27,11 +17,18 @@ check_command pip3
 check_command pactl
 check_command wget
 check_command tar
+check_command build-essential
+check_command git
+check_command pkg-config
+
+# Check for FFmpeg later, as we attempt to install it
+
 echo "Prerequisites check complete."
 echo "-------------------------------------------------------------------------"
 
 # --- Step 2/6: Setting up Virtual Environment and Installing Flask ---
 echo "Step 2/6: Setting up virtual environment and installing Flask..."
+PROJECT_DIR="audio_streamer"
 if [ -d "$PROJECT_DIR" ]; then
     echo "Project directory '$PROJECT_DIR' already exists."
 else
@@ -61,7 +58,7 @@ if check_command ffmpeg; then
 else
     echo "FFmpeg not found. Attempting a comprehensive installation..."
     sudo apt update
-    sudo apt install -y build-essential git pkg-config libpulse-dev libasound2-dev libv4l-dev libx11-dev libxext-dev libxfixes-dev libxv-dev libxvidcore-0-dev libx264-dev libmp3lame-dev libopus-dev libvpx-dev zlib1g-dev
+    sudo apt install -y libpulse-dev libasound2-dev libv4l-dev libx11-dev libxext-dev libxfixes-dev libxv-dev libxvidcore-0-dev libx264-dev libmp3lame-dev libopus-dev libvpx-dev zlib1g-dev
     FFMPEG_VERSION="$(wget -qO- https://api.github.com/repos/FFmpeg/FFmpeg/releases/latest | grep tag_name | cut -d '"' -f 4)"
     if [ -z "$FFMPEG_VERSION" ]; then
         FFMPEG_VERSION="n6.1.1"
@@ -91,6 +88,9 @@ echo "-------------------------------------------------------------------------"
 
 # --- Step 4/6: Setting up Audio Capture Sink (PulseAudio) ---
 echo "Step 4/6: Setting up Audio Capture Sink (PulseAudio)..."
+NULL_SINK_NAME="virtual-audio-capture"
+NULL_SINK_MODULE="module-null-sink"
+
 if ! pactl list short sinks | grep -q "$NULL_SINK_NAME"; then
     echo "Creating PulseAudio virtual sink '$NULL_SINK_NAME'..."
     if pactl load-module "$NULL_SINK_MODULE" sink_name="$NULL_SINK_NAME" sink_properties='device.description="Virtual Audio Capture"' > /dev/null 2>&1; then
